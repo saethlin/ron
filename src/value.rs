@@ -132,10 +132,46 @@ type MapInner = std::collections::BTreeMap<Value, Value>;
 type MapInner = indexmap::IndexMap<Value, Value>;
 
 /// A wrapper for a number, which can be either `f64` or `i64`.
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Hash, Ord)]
+#[derive(Copy, Clone, Debug, PartialOrd, Eq, Ord)]
 pub enum Number {
     Integer(i64),
     Float(Float),
+}
+
+const MAX_INTEGRAL_FLOAT: f64 = 9007199254740991.0;
+
+impl PartialEq for Number {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Number::Integer(s), Number::Integer(o)) => s == o,
+            (Number::Float(s), Number::Float(o)) => s == o,
+            (Number::Integer(s), Number::Float(o)) | (Number::Float(o), Number::Integer(s)) => {
+                if o.get().abs() > MAX_INTEGRAL_FLOAT {
+                    false
+                } else {
+                    *s as f64 == o.get()
+                }
+            }
+        }
+    }
+}
+
+impl Hash for Number {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: std::hash::Hasher,
+    {
+        match self {
+            Number::Integer(i) => i.hash(state),
+            Number::Float(f) => {
+                if f.get().fract() == 0.0 && f.get().abs() <= MAX_INTEGRAL_FLOAT {
+                    (f.get() as i64).hash(state)
+                } else {
+                    f.hash(state)
+                }
+            }
+        }
+    }
 }
 
 /// A wrapper for `f64`, which guarantees that the inner value
